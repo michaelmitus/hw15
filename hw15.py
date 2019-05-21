@@ -63,6 +63,7 @@ def third():
               GROUP BY G.Name
               ORDER BY sum(Quantity) DESC
               LIMIT 1
+           
             '''
         curID = con.cursor()
         curID.execute(query_qenre)
@@ -87,12 +88,60 @@ def third():
       if con is not None:
         con.close()
 
+def third2():
+    # Вывести самый популярный, на основании кол-ва продаж, жанр (название) - всё так же
+    # и все треки в нем (название, альбом, исполнитель) - через более универсальный, и медленный вложенный запрос
+    try:
+        con = None
+        con = lite.connect('Chinook_Sqlite.sqlite')
+        query_qenre = '''
+            WITH sum_quantity AS
+                (SELECT G.Name, G.GenreID, SUM(Quantity) AS Quantity
+                 FROM Genre AS G
+                      INNER JOIN Track AS T ON T.GenreID = G.GenreID
+                      INNER JOIN InvoiceLine AS I ON I.TrackID = T.TrackID
+                GROUP BY G.Name)
+            SELECT a.Name FROM sum_quantity AS a 
+            WHERE a.Quantity = (SELECT max(Quantity) FROM sum_quantity)
+                '''
+        curID = con.cursor()
+        curID.execute(query_qenre)
+        max_genre = curID.fetchone()[0]
+        print(max_genre)
+        query_track = '''
+            WITH sum_quantity AS
+                (SELECT G.Name, G.GenreID, SUM(Quantity) AS Quantity
+                 FROM Genre AS G
+                      INNER JOIN Track AS T ON T.GenreID = G.GenreID
+                      INNER JOIN InvoiceLine AS I ON I.TrackID = T.TrackID
+                GROUP BY G.Name)
+              SELECT T.Name, Album.Title, Artist.Name
+              FROM Track as T   
+              INNER JOIN Genre as G ON T.GenreID = G.GenreID
+              INNER JOIN Album ON Album.AlbumID = T.AlbumID
+              INNER JOIN Artist ON Album.ArtistID = Artist.ArtistID
+              WHERE G.Name Like 
+                  (SELECT a.Name FROM sum_quantity AS a 
+                    WHERE a.Quantity = (SELECT max(Quantity) FROM sum_quantity))          
+            '''
+        curID = con.cursor()
+        curID.execute(query_track)
+        pprint.pprint(curID.fetchall())
+
+    except Exception as e:
+      print(e)
+      sys.exit(1)
+    finally:
+      if con is not None:
+        con.close()
+
 #Вывести покупателей (полное имя, номер телефона) которые что либо покупали, проживающих в одном городе, если их кол-во в городе больше 1.
-first()
+#first()
 
 #Вывести топ 3 самых платежеспособных города за все время.
 #second()
 
 #Вывести самый популярный, на основании кол-ва продаж, жанр (название) и все треки в нем (название, альбом, исполнитель).
 #third()
+third2()
 
